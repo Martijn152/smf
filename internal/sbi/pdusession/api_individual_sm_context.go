@@ -10,6 +10,8 @@
 package pdusession
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -90,31 +92,29 @@ func HTTPUpdateSmContext(c *gin.Context) {
 	}
 }
 
-// HTTPUpdateSmContext - Update SM Context
+// HTTPUpdatePFCPSession - Update PFCP Session directly
 func HTTPUpdatePFCPSession(c *gin.Context) {
 	logger.PduSessLog.Info("Receive Update SM Context Request")
-	var request models.UpdateSmContextRequest
-	request.JsonData = new(models.SmContextUpdateData)
 
-	s := strings.Split(c.GetHeader("Content-Type"), ";")
-	var err error
-	switch s[0] {
-	case "application/json":
-		err = c.ShouldBindJSON(request.JsonData)
-	case "multipart/related":
-		err = c.ShouldBindWith(&request, openapi.MultipartRelatedBinding{})
-	}
+	// read raw JSON from request
+	jsonData, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
 		log.Print(err)
 		return
 	}
 
-	req := httpwrapper.NewRequest(c.Request, request)
-	req.Params["smContextRef"] = c.Params.ByName("smContextRef")
+	// convert raw JSON to map
+	var dataString map[string]string
+	err = json.Unmarshal(jsonData, &dataString)
+	if err != nil {
+		log.Print(err)
+		return
+	}
 
-	smContextRef := req.Params["smContextRef"]
-	HTTPResponse := producer.HandlePDUSessionPFCPUpdate(
-		smContextRef)
+	// set pduAddress to the correct part of the JSON
+	pduAddress := dataString["IP"]
+	// handle update
+	HTTPResponse := producer.HandlePDUSessionPFCPUpdate(pduAddress)
 
 	if HTTPResponse.Status < 300 {
 		c.Render(HTTPResponse.Status, openapi.MultipartRelatedRender{Data: HTTPResponse.Body})
