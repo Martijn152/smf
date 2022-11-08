@@ -816,8 +816,8 @@ func HandlePDUSessionPFCPUpdate(smContextRef string) *httpwrapper.Response {
 	// GSM State
 	// PDU Session Modification Reject(Cause Value == 43 || Cause Value != 43)/Complete
 	// PDU Session Release Command/Complete
-	logger.PduSessLog.Infoln("In HandlePDUSessionSMContextUpdate")
-	smContext := smf_context.GetSMContextByRef(smContextRef)
+	logger.PduSessLog.Infoln("In HandlePDUSessionPFCPUpdate")
+	smContext := smf_context.GetSMContextByPDUAddress("10.60.0.1")
 
 	if smContext == nil {
 		logger.PduSessLog.Warnf("SMContext[%s] is not found", smContextRef)
@@ -830,7 +830,7 @@ func HandlePDUSessionPFCPUpdate(smContextRef string) *httpwrapper.Response {
 					UpCnxState: models.UpCnxState_DEACTIVATED,
 					Error: &models.ProblemDetails{
 						Type:   "Resource Not Found",
-						Title:  "SMContext Ref is not found",
+						Title:  "SMContext PDUAddress is not found",
 						Status: http.StatusNotFound,
 					},
 				},

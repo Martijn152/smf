@@ -177,6 +177,22 @@ func GetSMContextByRef(ref string) *SMContext {
 	return smCtx
 }
 
+func GetSMContextByPDUAddress(pduAddress string) *SMContext {
+	var smCtx *SMContext
+
+	// loop through the map
+	smContextPool.Range(func(key, value interface{}) bool {
+
+		fmt.Printf("\tkey: %v, value: %v\n", key, value)
+		if value.(*SMContext).PDUAddress.String() == pduAddress {
+			smCtx = value.(*SMContext)
+			return false
+		}
+		return true
+	})
+	return smCtx
+}
+
 func GetSMContextById(id string, pduSessID int32) *SMContext {
 	var smCtx *SMContext
 	ref, err := ResolveRef(id, pduSessID)
