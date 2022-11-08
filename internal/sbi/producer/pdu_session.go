@@ -812,15 +812,15 @@ func HandlePDUSessionSMContextUpdate(smContextRef string, body models.UpdateSmCo
 	return httpResponse
 }
 
-func HandlePDUSessionPFCPUpdate(smContextRef string) *httpwrapper.Response {
+func HandlePDUSessionPFCPUpdate(pduAddress string) *httpwrapper.Response {
 	// GSM State
 	// PDU Session Modification Reject(Cause Value == 43 || Cause Value != 43)/Complete
 	// PDU Session Release Command/Complete
 	logger.PduSessLog.Infoln("In HandlePDUSessionPFCPUpdate")
-	smContext := smf_context.GetSMContextByPDUAddress("10.60.0.1")
+	smContext := smf_context.GetSMContextByPDUAddress(pduAddress)
 
 	if smContext == nil {
-		logger.PduSessLog.Warnf("SMContext[%s] is not found", smContextRef)
+		logger.PduSessLog.Warnf("PDUAddress[%s] is not found", pduAddress)
 
 		httpResponse := &httpwrapper.Response{
 			Header: nil,
