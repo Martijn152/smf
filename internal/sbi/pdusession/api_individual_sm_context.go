@@ -113,8 +113,10 @@ func HTTPUpdatePFCPSession(c *gin.Context) {
 
 	// set pduAddress to the correct part of the JSON
 	pduAddress := dataString["IP"]
+	dlfar := dataString["dlfar"]
+	ulfar := dataString["ulfar"]
 	// handle update
-	HTTPResponse := producer.HandlePDUSessionPFCPUpdate(pduAddress)
+	HTTPResponse := producer.HandlePDUSessionPFCPUpdate(pduAddress, dlfar, ulfar)
 
 	if HTTPResponse.Status < 300 {
 		c.Render(HTTPResponse.Status, openapi.MultipartRelatedRender{Data: HTTPResponse.Body})
