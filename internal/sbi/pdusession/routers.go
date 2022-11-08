@@ -120,4 +120,11 @@ var routes = Routes{
 		"/sm-contexts",
 		HTTPPostSmContexts,
 	},
+
+	{
+		"UpdatePFCPSession",
+		strings.ToUpper("Post"),
+		"/sm-contexts/:smContextRef/pfcp",
+		HTTPUpdatePFCPSession,
+	},
 }

@@ -89,3 +89,36 @@ func HTTPUpdateSmContext(c *gin.Context) {
 		c.JSON(HTTPResponse.Status, HTTPResponse.Body)
 	}
 }
+
+// HTTPUpdateSmContext - Update SM Context
+func HTTPUpdatePFCPSession(c *gin.Context) {
+	logger.PduSessLog.Info("Receive Update SM Context Request")
+	var request models.UpdateSmContextRequest
+	request.JsonData = new(models.SmContextUpdateData)
+
+	s := strings.Split(c.GetHeader("Content-Type"), ";")
+	var err error
+	switch s[0] {
+	case "application/json":
+		err = c.ShouldBindJSON(request.JsonData)
+	case "multipart/related":
+		err = c.ShouldBindWith(&request, openapi.MultipartRelatedBinding{})
+	}
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
+	req := httpwrapper.NewRequest(c.Request, request)
+	req.Params["smContextRef"] = c.Params.ByName("smContextRef")
+
+	smContextRef := req.Params["smContextRef"]
+	HTTPResponse := producer.HandlePDUSessionPFCPUpdate(
+		smContextRef)
+
+	if HTTPResponse.Status < 300 {
+		c.Render(HTTPResponse.Status, openapi.MultipartRelatedRender{Data: HTTPResponse.Body})
+	} else {
+		c.JSON(HTTPResponse.Status, HTTPResponse.Body)
+	}
+}
