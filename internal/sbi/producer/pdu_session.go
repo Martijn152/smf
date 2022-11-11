@@ -890,7 +890,8 @@ func HandlePDUSessionPFCPUpdate(ip string, pdrsFromRequest []map[string]string) 
 			logger.PduSessLog.Errorf("AN Release Error")
 		} else {
 			// set state of the rule = UPDATE
-			DLPDR.FAR.State = smf_context.RULE_UPDATE
+			DLPDR.FAR.State = smf_context.RULE_UPDATE //FAR
+			DLPDR.State = smf_context.RULE_UPDATE     //PDR
 
 			// set FAR actions (only Forw and Drop supported for now)
 			DLPDR.FAR.ApplyAction.Forw = pdrsFromRequest[0]["FARAction"] == "Forw"
@@ -924,7 +925,8 @@ func HandlePDUSessionPFCPUpdate(ip string, pdrsFromRequest []map[string]string) 
 			logger.PduSessLog.Errorf("AN Release Error")
 		} else {
 			// set state of the rule = UPDATE
-			ULPDR.FAR.State = smf_context.RULE_UPDATE
+			ULPDR.FAR.State = smf_context.RULE_UPDATE //FAR
+			ULPDR.State = smf_context.RULE_UPDATE     //PDR
 
 			// set FAR actions (only Forw and Drop supported for now)
 			ULPDR.FAR.ApplyAction.Forw = pdrsFromRequest[1]["FARAction"] == "Forw"
