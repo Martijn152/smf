@@ -116,7 +116,8 @@ func HTTPUpdatePFCPSession(c *gin.Context) {
 	// dlfar := dataString["dlfar"]
 	// ulfar := dataString["ulfar"]
 	// handle update
-	HTTPResponse := producer.HandlePDUSessionPFCPUpdate(dataString)
+
+	HTTPResponse := producer.HandlePDUSessionPFCPUpdate(dataString["IP"].(string), dataString["PDRs"].([]map[string]string))
 
 	if HTTPResponse.Status < 300 {
 		c.Render(HTTPResponse.Status, openapi.MultipartRelatedRender{Data: HTTPResponse.Body})

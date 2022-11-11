@@ -812,14 +812,14 @@ func HandlePDUSessionSMContextUpdate(smContextRef string, body models.UpdateSmCo
 	return httpResponse
 }
 
-func HandlePDUSessionPFCPUpdate(dataString map[string]interface{}) *httpwrapper.Response {
+func HandlePDUSessionPFCPUpdate(ip string, pdrsFromRequest []map[string]string) *httpwrapper.Response {
 	// GSM State
 	// PDU Session Modification Reject(Cause Value == 43 || Cause Value != 43)/Complete
 	// PDU Session Release Command/Complete
 	logger.PduSessLog.Infoln("In HandlePDUSessionPFCPUpdate")
 
-	pduAddress := dataString["IP"]
-	smContext := smf_context.GetSMContextByPDUAddress(pduAddress.(string))
+	pduAddress := ip
+	smContext := smf_context.GetSMContextByPDUAddress(pduAddress)
 
 	if smContext == nil {
 		logger.PduSessLog.Warnf("PDUAddress[%s] is not found", pduAddress)
@@ -882,8 +882,6 @@ func HandlePDUSessionPFCPUpdate(dataString map[string]interface{}) *httpwrapper.
 	var farid uint32 = 1
 	var precedence uint32 = 255
 	var filterid uint32 = 1
-
-	var pdrsFromRequest = dataString["PDRs"].([]map[string]string)
 
 	// create new PDRs according to input
 	for i := 1; i < len(pdrsFromRequest); i++ {
