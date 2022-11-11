@@ -915,6 +915,7 @@ func HandlePDUSessionPFCPUpdate(ip string, pdrsFromRequest []map[string]string) 
 			// set other state things to signal what to do later
 			smContext.PendingUPF[ANUPF.GetNodeIP()] = true
 			farList = append(farList, DLPDR.FAR)
+			pdrList = append(pdrList, DLPDR)
 			sendPFCPModification = true
 			smContext.SMContextState = smf_context.PFCPModification
 		}
@@ -950,6 +951,7 @@ func HandlePDUSessionPFCPUpdate(ip string, pdrsFromRequest []map[string]string) 
 			// set other state things to signal what to do later
 			smContext.PendingUPF[ANUPF.GetNodeIP()] = true
 			farList = append(farList, ULPDR.FAR)
+			pdrList = append(pdrList, ULPDR)
 			sendPFCPModification = true
 			smContext.SMContextState = smf_context.PFCPModification
 		}
