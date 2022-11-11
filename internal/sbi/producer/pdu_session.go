@@ -873,144 +873,67 @@ func HandlePDUSessionPFCPUpdate(ip string, pdrsFromRequest []map[string]string) 
 	logger.CtxLog.Traceln("SMContextState Change State: ", smContext.SMContextState.String())
 	response.JsonData.UpCnxState = models.UpCnxState_DEACTIVATED
 
-	// clear the PDR list
-	for _, pdr := range pdrList {
-		pdr.State = smf_context.RULE_REMOVE
+	// for my use case the previous method was overkill
+	// only want to add and remove SDF from existing PDRs
+	// Packets that are not matched by any PDR are dropped by the UPF. - TS 129 244
+
+	// TODO: Deactivate N2 downlink tunnel
+	// Set FAR and An, N3 Release Info
+	farList = []*smf_context.FAR{}
+	smContext.PendingUPF = make(smf_context.PendingUPF)
+	for _, dataPath := range smContext.Tunnel.DataPathPool {
+		ANUPF := dataPath.FirstDPNode
+
+		// Downlink
+		DLPDR := ANUPF.DownLinkTunnel.PDR
+		if DLPDR == nil {
+			logger.PduSessLog.Errorf("AN Release Error")
+		} else {
+			// set state of the rule = UPDATE
+			DLPDR.FAR.State = smf_context.RULE_UPDATE
+
+			// set FAR actions (only Forw and Drop supported for now)
+			DLPDR.FAR.ApplyAction.Forw = pdrsFromRequest[0]["FARAction"] == "Forw"
+			DLPDR.FAR.ApplyAction.Drop = pdrsFromRequest[0]["FARAction"] == "Drop"
+
+			// add SDF to the PDR rule
+			DLPDR.PDI.SDFFilter.Fd = true
+			DLPDR.PDI.SDFFilter.FlowDescription = []byte(pdrsFromRequest[0]["SDF"])
+			DLPDR.PDI.SDFFilter.LengthOfFlowDescription = uint16(len(pdrsFromRequest[0]["SDF"]))
+
+			// set other state things to signal what to do later
+			smContext.PendingUPF[ANUPF.GetNodeIP()] = true
+			farList = append(farList, DLPDR.FAR)
+			sendPFCPModification = true
+			smContext.SMContextState = smf_context.PFCPModification
+		}
+
+		// Uplink
+		ULPDR := ANUPF.UpLinkTunnel.PDR
+		if ULPDR == nil {
+			logger.PduSessLog.Errorf("AN Release Error")
+		} else {
+			// set state of the rule = UPDATE
+			ULPDR.FAR.State = smf_context.RULE_UPDATE
+
+			// set FAR actions (only Forw and Drop supported for now)
+			ULPDR.FAR.ApplyAction.Forw = pdrsFromRequest[1]["FARAction"] == "Forw"
+			ULPDR.FAR.ApplyAction.Drop = pdrsFromRequest[1]["FARAction"] == "Drop"
+
+			// add SDF to the PDR rule
+			ULPDR.PDI.SDFFilter.Fd = true
+			ULPDR.PDI.SDFFilter.FlowDescription = []byte(pdrsFromRequest[1]["SDF"])
+			ULPDR.PDI.SDFFilter.LengthOfFlowDescription = uint16(len(pdrsFromRequest[1]["SDF"]))
+
+			// set other state things to signal what to do later
+			smContext.PendingUPF[ANUPF.GetNodeIP()] = true
+			farList = append(farList, ULPDR.FAR)
+			sendPFCPModification = true
+			smContext.SMContextState = smf_context.PFCPModification
+		}
+
 	}
 
-	var pdrid uint16 = 1
-	var farid uint32 = 1
-	var precedence uint32 = 255
-	var filterid uint32 = 1
-
-	// create new PDRs according to input
-	for i := 1; i < len(pdrsFromRequest); i++ {
-
-		var ifacevalue uint8
-
-		switch pdrsFromRequest[i]["SourceInterface"] {
-		case "Access":
-			ifacevalue = pfcpType.SourceInterfaceAccess
-		case "Core":
-			ifacevalue = pfcpType.SourceInterfaceCore
-		}
-
-		var drop bool
-
-		switch pdrsFromRequest[i]["FARAction"] {
-		case "Drop":
-			drop = true
-		case "Forw":
-			drop = false
-		}
-
-		// create a PDR
-		newPdr := smf_context.PDR{
-			PDRID:      pdrid,
-			Precedence: precedence,
-			PDI: smf_context.PDI{
-				SourceInterface: pfcpType.SourceInterface{InterfaceValue: ifacevalue},
-				SDFFilter: &pfcpType.SDFFilter{
-					Bid:                     true,
-					Fl:                      false,
-					Spi:                     false,
-					Ttc:                     false,
-					Fd:                      true,
-					LengthOfFlowDescription: uint16(len(pdrsFromRequest[i]["SDF"])),
-					FlowDescription:         []byte(pdrsFromRequest[i]["SDF"]),
-					TosTrafficClass:         nil,
-					SecurityParameterIndex:  nil,
-					FlowLabel:               nil,
-					SdfFilterId:             filterid,
-				},
-			},
-			OuterHeaderRemoval: nil,
-			FAR: &smf_context.FAR{
-				FARID: farid,
-				ApplyAction: pfcpType.ApplyAction{
-					Dupl: false,
-					Nocp: false,
-					Buff: false,
-					Forw: !drop,
-					Drop: drop,
-				},
-				State: smf_context.RULE_CREATE,
-			},
-			URR:   nil,
-			QER:   nil,
-			State: smf_context.RULE_CREATE,
-		}
-
-		precedence = precedence - 1
-		pdrid = pdrid + 1
-		farid = farid + 1
-		filterid = filterid + 1
-
-		pdrList = append(pdrList, &newPdr)
-		farList = append(farList, newPdr.FAR)
-	}
-
-	sendPFCPModification = true
-	smContext.SMContextState = smf_context.PFCPModification
-
-	/*
-		// TODO: Deactivate N2 downlink tunnel
-		// Set FAR and An, N3 Release Info
-		farList = []*smf_context.FAR{}
-		smContext.PendingUPF = make(smf_context.PendingUPF)
-		for _, dataPath := range smContext.Tunnel.DataPathPool {
-			ANUPF := dataPath.FirstDPNode
-
-			// Downlink
-			DLPDR := ANUPF.DownLinkTunnel.PDR
-			if DLPDR == nil {
-				logger.PduSessLog.Errorf("AN Release Error")
-			} else {
-				DLPDR.FAR.State = smf_context.RULE_UPDATE
-				switch dlfar {
-				case "Forw":
-					DLPDR.FAR.ApplyAction.Forw = true
-					DLPDR.FAR.ApplyAction.Buff = false
-					DLPDR.FAR.ApplyAction.Nocp = false
-					DLPDR.FAR.ApplyAction.Drop = false
-				case "Drop":
-					DLPDR.FAR.ApplyAction.Forw = false
-					DLPDR.FAR.ApplyAction.Buff = false
-					DLPDR.FAR.ApplyAction.Nocp = false
-					DLPDR.FAR.ApplyAction.Drop = true
-				}
-				smContext.PendingUPF[ANUPF.GetNodeIP()] = true
-				farList = append(farList, DLPDR.FAR)
-				sendPFCPModification = true
-				smContext.SMContextState = smf_context.PFCPModification
-			}
-
-			// Uplink
-			ULPDR := ANUPF.UpLinkTunnel.PDR
-			if ULPDR == nil {
-				logger.PduSessLog.Errorf("AN Release Error")
-			} else {
-				ULPDR.FAR.State = smf_context.RULE_UPDATE
-				switch ulfar {
-				case "Forw":
-					ULPDR.FAR.ApplyAction.Forw = true
-					ULPDR.FAR.ApplyAction.Buff = false
-					ULPDR.FAR.ApplyAction.Nocp = false
-					ULPDR.FAR.ApplyAction.Drop = false
-				case "Drop":
-					ULPDR.FAR.ApplyAction.Forw = false
-					ULPDR.FAR.ApplyAction.Buff = false
-					ULPDR.FAR.ApplyAction.Nocp = false
-					ULPDR.FAR.ApplyAction.Drop = true
-				}
-				smContext.PendingUPF[ANUPF.GetNodeIP()] = true
-				farList = append(farList, ULPDR.FAR)
-				sendPFCPModification = true
-				smContext.SMContextState = smf_context.PFCPModification
-			}
-		}
-
-	*/
 	logger.CtxLog.Traceln("SMContextState Change State: ", smContext.SMContextState.String())
 
 	var httpResponse *httpwrapper.Response
