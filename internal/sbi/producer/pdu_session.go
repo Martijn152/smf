@@ -947,6 +947,7 @@ func HandlePDUSessionPFCPUpdate(ip string, pdrsFromRequest []map[string]string) 
 		filterid = filterid + 1
 
 		pdrList = append(pdrList, &newPdr)
+		farList = append(farList, newPdr.FAR)
 	}
 
 	sendPFCPModification = true
