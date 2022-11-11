@@ -888,7 +888,7 @@ func HandlePDUSessionPFCPUpdate(dataString map[string]interface{}) *httpwrapper.
 
 		var ifacevalue uint8
 
-		switch dataString["PDRs"].([]interface{})[i].(map[string]string)["SourceInterface"] {
+		switch dataString["PDRs"].([]interface{})[i].(map[string]interface{})["SourceInterface"].(string) {
 		case "Access":
 			ifacevalue = pfcpType.SourceInterfaceAccess
 		case "Core":
@@ -897,7 +897,7 @@ func HandlePDUSessionPFCPUpdate(dataString map[string]interface{}) *httpwrapper.
 
 		var drop bool
 
-		switch dataString["PDRs"].([]interface{})[i].(map[string]string)["FARAction"] {
+		switch dataString["PDRs"].([]interface{})[i].(map[string]interface{})["FARAction"].(string) {
 		case "Drop":
 			drop = true
 		case "Forw":
