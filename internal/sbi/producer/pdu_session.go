@@ -883,12 +883,14 @@ func HandlePDUSessionPFCPUpdate(dataString map[string]interface{}) *httpwrapper.
 	var precedence uint32 = 255
 	var filterid uint32 = 1
 
+	var pdrsFromRequest = dataString["PDRs"].([]map[string]string)
+
 	// create new PDRs according to input
-	for i := 1; i < len(dataString["PDRs"].([]interface{})); i++ {
+	for i := 1; i < len(pdrsFromRequest); i++ {
 
 		var ifacevalue uint8
 
-		switch dataString["PDRs"].([]interface{})[i].(map[string]interface{})["SourceInterface"].(string) {
+		switch pdrsFromRequest[i]["SourceInterface"] {
 		case "Access":
 			ifacevalue = pfcpType.SourceInterfaceAccess
 		case "Core":
@@ -897,7 +899,7 @@ func HandlePDUSessionPFCPUpdate(dataString map[string]interface{}) *httpwrapper.
 
 		var drop bool
 
-		switch dataString["PDRs"].([]interface{})[i].(map[string]interface{})["FARAction"].(string) {
+		switch pdrsFromRequest[i]["FARAction"] {
 		case "Drop":
 			drop = true
 		case "Forw":
@@ -916,8 +918,8 @@ func HandlePDUSessionPFCPUpdate(dataString map[string]interface{}) *httpwrapper.
 					Spi:                     false,
 					Ttc:                     false,
 					Fd:                      true,
-					LengthOfFlowDescription: uint16(len(dataString["PDRs"].([]interface{})[i].(map[string]string)["SDF"])),
-					FlowDescription:         []byte(dataString["PDRs"].([]interface{})[i].(map[string]string)["SDF"]),
+					LengthOfFlowDescription: uint16(len(pdrsFromRequest[i]["SDF"])),
+					FlowDescription:         []byte(pdrsFromRequest[i]["SDF"]),
 					TosTrafficClass:         nil,
 					SecurityParameterIndex:  nil,
 					FlowLabel:               nil,
