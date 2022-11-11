@@ -812,12 +812,14 @@ func HandlePDUSessionSMContextUpdate(smContextRef string, body models.UpdateSmCo
 	return httpResponse
 }
 
-func HandlePDUSessionPFCPUpdate(pduAddress string, dlfar string, ulfar string) *httpwrapper.Response {
+func HandlePDUSessionPFCPUpdate(dataString map[string]interface{}) *httpwrapper.Response {
 	// GSM State
 	// PDU Session Modification Reject(Cause Value == 43 || Cause Value != 43)/Complete
 	// PDU Session Release Command/Complete
 	logger.PduSessLog.Infoln("In HandlePDUSessionPFCPUpdate")
-	smContext := smf_context.GetSMContextByPDUAddress(pduAddress)
+
+	pduAddress := dataString["IP"]
+	smContext := smf_context.GetSMContextByPDUAddress(pduAddress.(string))
 
 	if smContext == nil {
 		logger.PduSessLog.Warnf("PDUAddress[%s] is not found", pduAddress)
@@ -871,62 +873,143 @@ func HandlePDUSessionPFCPUpdate(pduAddress string, dlfar string, ulfar string) *
 	logger.CtxLog.Traceln("SMContextState Change State: ", smContext.SMContextState.String())
 	response.JsonData.UpCnxState = models.UpCnxState_DEACTIVATED
 
-	// TODO: Deactivate N2 downlink tunnel
-	// Set FAR and An, N3 Release Info
-	farList = []*smf_context.FAR{}
-	smContext.PendingUPF = make(smf_context.PendingUPF)
-	for _, dataPath := range smContext.Tunnel.DataPathPool {
-		ANUPF := dataPath.FirstDPNode
-
-		// Downlink
-		DLPDR := ANUPF.DownLinkTunnel.PDR
-		if DLPDR == nil {
-			logger.PduSessLog.Errorf("AN Release Error")
-		} else {
-			DLPDR.FAR.State = smf_context.RULE_UPDATE
-			switch dlfar {
-			case "Forw":
-				DLPDR.FAR.ApplyAction.Forw = true
-				DLPDR.FAR.ApplyAction.Buff = false
-				DLPDR.FAR.ApplyAction.Nocp = false
-				DLPDR.FAR.ApplyAction.Drop = false
-			case "Drop":
-				DLPDR.FAR.ApplyAction.Forw = false
-				DLPDR.FAR.ApplyAction.Buff = false
-				DLPDR.FAR.ApplyAction.Nocp = false
-				DLPDR.FAR.ApplyAction.Drop = true
-			}
-			smContext.PendingUPF[ANUPF.GetNodeIP()] = true
-			farList = append(farList, DLPDR.FAR)
-			sendPFCPModification = true
-			smContext.SMContextState = smf_context.PFCPModification
-		}
-
-		// Uplink
-		ULPDR := ANUPF.UpLinkTunnel.PDR
-		if ULPDR == nil {
-			logger.PduSessLog.Errorf("AN Release Error")
-		} else {
-			ULPDR.FAR.State = smf_context.RULE_UPDATE
-			switch ulfar {
-			case "Forw":
-				ULPDR.FAR.ApplyAction.Forw = true
-				ULPDR.FAR.ApplyAction.Buff = false
-				ULPDR.FAR.ApplyAction.Nocp = false
-				ULPDR.FAR.ApplyAction.Drop = false
-			case "Drop":
-				ULPDR.FAR.ApplyAction.Forw = false
-				ULPDR.FAR.ApplyAction.Buff = false
-				ULPDR.FAR.ApplyAction.Nocp = false
-				ULPDR.FAR.ApplyAction.Drop = true
-			}
-			smContext.PendingUPF[ANUPF.GetNodeIP()] = true
-			farList = append(farList, ULPDR.FAR)
-			sendPFCPModification = true
-			smContext.SMContextState = smf_context.PFCPModification
-		}
+	// clear the PDR list
+	for _, pdr := range pdrList {
+		pdr.State = smf_context.RULE_REMOVE
 	}
 
+	var pdrid uint16 = 1
+	var farid uint32 = 1
+	var precedence uint32 = 255
+	var filterid uint32 = 1
+
+	// create new PDRs according to input
+	for i := 1; i < len(dataString["PDRs"].([]interface{})); i++ {
+
+		var ifacevalue uint8
+
+		switch dataString["PDRs"].([]interface{})[i].(map[string]string)["SourceInterface"] {
+		case "Access":
+			ifacevalue = pfcpType.SourceInterfaceAccess
+		case "Core":
+			ifacevalue = pfcpType.SourceInterfaceCore
+		}
+
+		var drop bool
+
+		switch dataString["PDRs"].([]interface{})[i].(map[string]string)["FARAction"] {
+		case "Drop":
+			drop = true
+		case "Forw":
+			drop = false
+		}
+
+		// create a PDR
+		newPdr := smf_context.PDR{
+			PDRID:      pdrid,
+			Precedence: precedence,
+			PDI: smf_context.PDI{
+				SourceInterface: pfcpType.SourceInterface{InterfaceValue: ifacevalue},
+				SDFFilter: &pfcpType.SDFFilter{
+					Bid:                     true,
+					Fl:                      false,
+					Spi:                     false,
+					Ttc:                     false,
+					Fd:                      true,
+					LengthOfFlowDescription: uint16(len(dataString["PDRs"].([]interface{})[i].(map[string]string)["SDF"])),
+					FlowDescription:         []byte(dataString["PDRs"].([]interface{})[i].(map[string]string)["SDF"]),
+					TosTrafficClass:         nil,
+					SecurityParameterIndex:  nil,
+					FlowLabel:               nil,
+					SdfFilterId:             filterid,
+				},
+			},
+			OuterHeaderRemoval: nil,
+			FAR: &smf_context.FAR{
+				FARID: farid,
+				ApplyAction: pfcpType.ApplyAction{
+					Dupl: false,
+					Nocp: false,
+					Buff: false,
+					Forw: !drop,
+					Drop: drop,
+				},
+				State: smf_context.RULE_CREATE,
+			},
+			URR:   nil,
+			QER:   nil,
+			State: smf_context.RULE_CREATE,
+		}
+
+		precedence = precedence - 1
+		pdrid = pdrid + 1
+		farid = farid + 1
+		filterid = filterid + 1
+
+		pdrList = append(pdrList, &newPdr)
+	}
+
+	sendPFCPModification = true
+	smContext.SMContextState = smf_context.PFCPModification
+
+	/*
+		// TODO: Deactivate N2 downlink tunnel
+		// Set FAR and An, N3 Release Info
+		farList = []*smf_context.FAR{}
+		smContext.PendingUPF = make(smf_context.PendingUPF)
+		for _, dataPath := range smContext.Tunnel.DataPathPool {
+			ANUPF := dataPath.FirstDPNode
+
+			// Downlink
+			DLPDR := ANUPF.DownLinkTunnel.PDR
+			if DLPDR == nil {
+				logger.PduSessLog.Errorf("AN Release Error")
+			} else {
+				DLPDR.FAR.State = smf_context.RULE_UPDATE
+				switch dlfar {
+				case "Forw":
+					DLPDR.FAR.ApplyAction.Forw = true
+					DLPDR.FAR.ApplyAction.Buff = false
+					DLPDR.FAR.ApplyAction.Nocp = false
+					DLPDR.FAR.ApplyAction.Drop = false
+				case "Drop":
+					DLPDR.FAR.ApplyAction.Forw = false
+					DLPDR.FAR.ApplyAction.Buff = false
+					DLPDR.FAR.ApplyAction.Nocp = false
+					DLPDR.FAR.ApplyAction.Drop = true
+				}
+				smContext.PendingUPF[ANUPF.GetNodeIP()] = true
+				farList = append(farList, DLPDR.FAR)
+				sendPFCPModification = true
+				smContext.SMContextState = smf_context.PFCPModification
+			}
+
+			// Uplink
+			ULPDR := ANUPF.UpLinkTunnel.PDR
+			if ULPDR == nil {
+				logger.PduSessLog.Errorf("AN Release Error")
+			} else {
+				ULPDR.FAR.State = smf_context.RULE_UPDATE
+				switch ulfar {
+				case "Forw":
+					ULPDR.FAR.ApplyAction.Forw = true
+					ULPDR.FAR.ApplyAction.Buff = false
+					ULPDR.FAR.ApplyAction.Nocp = false
+					ULPDR.FAR.ApplyAction.Drop = false
+				case "Drop":
+					ULPDR.FAR.ApplyAction.Forw = false
+					ULPDR.FAR.ApplyAction.Buff = false
+					ULPDR.FAR.ApplyAction.Nocp = false
+					ULPDR.FAR.ApplyAction.Drop = true
+				}
+				smContext.PendingUPF[ANUPF.GetNodeIP()] = true
+				farList = append(farList, ULPDR.FAR)
+				sendPFCPModification = true
+				smContext.SMContextState = smf_context.PFCPModification
+			}
+		}
+
+	*/
 	logger.CtxLog.Traceln("SMContextState Change State: ", smContext.SMContextState.String())
 
 	var httpResponse *httpwrapper.Response
