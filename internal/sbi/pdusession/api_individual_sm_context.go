@@ -104,7 +104,7 @@ func HTTPUpdatePFCPSession(c *gin.Context) {
 	}
 
 	// convert raw JSON to map
-	var dataString map[string]interface{}
+	var dataString PFCPModRequest
 	err = json.Unmarshal(jsonData, &dataString)
 	if err != nil {
 		log.Print(err)
@@ -117,11 +117,16 @@ func HTTPUpdatePFCPSession(c *gin.Context) {
 	// ulfar := dataString["ulfar"]
 	// handle update
 
-	HTTPResponse := producer.HandlePDUSessionPFCPUpdate(dataString["IP"].(string), dataString["PDRs"].([]map[string]string))
+	HTTPResponse := producer.HandlePDUSessionPFCPUpdate(dataString.IP, dataString.PDRs)
 
 	if HTTPResponse.Status < 300 {
 		c.Render(HTTPResponse.Status, openapi.MultipartRelatedRender{Data: HTTPResponse.Body})
 	} else {
 		c.JSON(HTTPResponse.Status, HTTPResponse.Body)
 	}
+}
+
+type PFCPModRequest struct {
+	IP   string
+	PDRs []map[string]string
 }
