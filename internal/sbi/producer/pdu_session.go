@@ -897,9 +897,19 @@ func HandlePDUSessionPFCPUpdate(ip string, pdrsFromRequest []map[string]string) 
 			DLPDR.FAR.ApplyAction.Drop = pdrsFromRequest[0]["FARAction"] == "Drop"
 
 			// add SDF to the PDR rule
-			DLPDR.PDI.SDFFilter.Fd = true
-			DLPDR.PDI.SDFFilter.FlowDescription = []byte(pdrsFromRequest[0]["SDF"])
-			DLPDR.PDI.SDFFilter.LengthOfFlowDescription = uint16(len(pdrsFromRequest[0]["SDF"]))
+			DLPDR.PDI.SDFFilter = &pfcpType.SDFFilter{
+				Bid:                     false,
+				Fl:                      false,
+				Spi:                     false,
+				Ttc:                     false,
+				Fd:                      true,
+				LengthOfFlowDescription: uint16(len(pdrsFromRequest[0]["SDF"])),
+				FlowDescription:         []byte(pdrsFromRequest[0]["SDF"]),
+			}
+
+			//DLPDR.PDI.SDFFilter.Fd = true
+			//DLPDR.PDI.SDFFilter.FlowDescription = []byte(pdrsFromRequest[0]["SDF"])
+			//DLPDR.PDI.SDFFilter.LengthOfFlowDescription = uint16(len(pdrsFromRequest[0]["SDF"]))
 
 			// set other state things to signal what to do later
 			smContext.PendingUPF[ANUPF.GetNodeIP()] = true
@@ -921,9 +931,19 @@ func HandlePDUSessionPFCPUpdate(ip string, pdrsFromRequest []map[string]string) 
 			ULPDR.FAR.ApplyAction.Drop = pdrsFromRequest[1]["FARAction"] == "Drop"
 
 			// add SDF to the PDR rule
-			ULPDR.PDI.SDFFilter.Fd = true
-			ULPDR.PDI.SDFFilter.FlowDescription = []byte(pdrsFromRequest[1]["SDF"])
-			ULPDR.PDI.SDFFilter.LengthOfFlowDescription = uint16(len(pdrsFromRequest[1]["SDF"]))
+			ULPDR.PDI.SDFFilter = &pfcpType.SDFFilter{
+				Bid:                     false,
+				Fl:                      false,
+				Spi:                     false,
+				Ttc:                     false,
+				Fd:                      true,
+				LengthOfFlowDescription: uint16(len(pdrsFromRequest[1]["SDF"])),
+				FlowDescription:         []byte(pdrsFromRequest[1]["SDF"]),
+			}
+
+			//ULPDR.PDI.SDFFilter.Fd = true
+			//ULPDR.PDI.SDFFilter.FlowDescription = []byte(pdrsFromRequest[1]["SDF"])
+			//ULPDR.PDI.SDFFilter.LengthOfFlowDescription = uint16(len(pdrsFromRequest[1]["SDF"]))
 
 			// set other state things to signal what to do later
 			smContext.PendingUPF[ANUPF.GetNodeIP()] = true
